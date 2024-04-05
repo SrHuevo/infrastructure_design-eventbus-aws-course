@@ -116,13 +116,11 @@ async function createTarget(target: TargetConfig): Promise<void> {
 }
 
 function extractRulesFromQueues(queues: QueueConfig[], eventBusName: string): RuleConfig[] {
-	const uniquePatterns = new Set<string>();
-
-	queues.forEach((queue) => {
-		queue.rulePattern.forEach((pattern) => {
-			uniquePatterns.add(pattern);
-		});
-	});
+	const uniquePatterns = queues.flatMap((queue) => {
+		return queue.rulePattern;
+	}).reduce((uniquePatterns, pattern) => {
+		return uniquePatterns.add(pattern);
+	}, new Set<string>());
 
 	return Array.from(uniquePatterns).map((pattern) => ({
 		name: formatRuleName(pattern),
@@ -132,26 +130,24 @@ function extractRulesFromQueues(queues: QueueConfig[], eventBusName: string): Ru
 }
 
 function extractTargetsFromQueues(queues: QueueConfig[], eventBusName: string): TargetConfig[] {
-	const targetsMap: Map<string, TargetConfig> = new Map();
-
-	queues.forEach((queue) => {
-		queue.rulePattern.forEach((pattern) => {
-			const ruleName = formatRuleName(pattern);
-			if (!targetsMap.has(ruleName)) {
-				targetsMap.set(ruleName, {
-					eventBusName,
-					ruleName,
-					queueName: [queue.name],
-				});
-			} else {
-				const target = targetsMap.get(ruleName);
-
-				if (target) {
-					target.queueName.push(queue.name);
-				}
+	const targetsMap = queues.flatMap((queue) => {
+		return queue.rulePattern
+	}).reduce((targetsMap, pattern) => {
+		const ruleName = formatRuleName(pattern);
+		if (!targetsMap.has(ruleName)) {
+			targetsMap.set(ruleName, {
+				eventBusName,
+				ruleName,
+				queueName: [queue.name],
+			});
+		} else {
+			const target = targetsMap.get(ruleName);
+	
+			if (target) {
+				target.queueName.push(queue.name);
 			}
-		});
-	});
+		}
+	}, new Map<string, TargetConfig>());
 
 	return Array.from(targetsMap.values());
 }
